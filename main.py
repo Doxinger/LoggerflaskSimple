@@ -4,39 +4,45 @@ import datetime
 app = Flask(__name__)
 
 def get_client_ip():
-    """Получает реальный IP-адрес клиента, учитывая прокси"""
+    """Получает реальный IP через ngrok/локальный прокси"""
+    # Основные заголовки которые используют ngrok и подобные сервисы
     if request.headers.get('X-Forwarded-For'):
-        # Берем первый IP из списка и убираем порт если есть
-        ip_with_port = request.headers.get('X-Forwarded-For').split(',')[0].strip()
-        client_ip = ip_with_port.split(':')[0]
+        # Берем первый IP из списка (реальный клиентский IP)
+        real_ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+        return real_ip
     elif request.headers.get('X-Real-IP'):
-        ip_with_port = request.headers.get('X-Real-IP')
-        client_ip = ip_with_port.split(':')[0]
+        return request.headers.get('X-Real-IP')
     else:
-        client_ip = request.remote_addr.split(':')[0]
-    
-    return client_ip
+        # Локальный запрос (без прокси)
+        return request.remote_addr
 
-@app.route('/', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'])
-def log_ip():
-    # Получаем реальный IP-адрес
+@app.route('/')
+def home():
     client_ip = get_client_ip()
-    
-    # Получаем текущее время
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Формируем запись для лога
+    # Логируем
     log_entry = f"{current_time} - IP: {client_ip} - Method: {request.method} - Path: {request.path}\n"
     
-    # Записываем в файл
     with open('log.txt', 'a', encoding='utf-8') as f:
         f.write(log_entry)
     
-    return f"Request from {client_ip} logged at {current_time}"
+    # Простой ответ
+    return f"""
+    <h1>IP Logger</h1>
+    <p><b>Your IP:</b> {client_ip}</p>
+    <p><b>Time:</b> {current_time}</p>
+    <p><b>URL:</b> {request.url}</p>
+    <hr>
+    <p>This IP has been logged to log.txt</p>
+    """
 
 @app.route('/<path:path>')
 def catch_all(path):
-    return log_ip()
+    return home()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True) 
+    print("Starting Flask server on http://localhost:5000")
+    print("Use ngrok: ngrok http 5000")
+    print("Then share the ngrok URL to collect IPs")
+    app.run(host='0.0.0.0', port=5000, debug=False) 
